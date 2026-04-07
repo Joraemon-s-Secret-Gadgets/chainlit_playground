@@ -1,0 +1,6 @@
+chainlit>=1.1.0
+SQLAlchemy>=2.0.0
+aiosqlite>=0.20.0
+
+# 추후 OpenAI 연동 시 활성화
+# openai>=1.10.0

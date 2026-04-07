@@ -47,13 +47,13 @@ allowed_executables = ["npx", "uvx"]
 [UI]
 name = "Assistant"
 
-# ✅ 핵심 1: 사이드바 강제 활성화
+# 사이드바 강제 활성화
 default_sidebar_state = "open"
 
-# ✅ 핵심 2: 설정을 사이드바로 이동
+# 설정을 사이드바로 이동
 chat_settings_location = "sidebar"
 
-# ✅ 핵심 3: 사이드바 열렸을 때 설정도 자동 오픈
+# 사이드바 열렸을 때 설정도 자동 오픈
 default_chat_settings_open = true
 
 confirm_new_chat = true
