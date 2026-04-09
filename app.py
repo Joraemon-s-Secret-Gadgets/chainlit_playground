@@ -1,23 +1,51 @@
-import chainlit as cl
+import os
+import sqlite3
+import hashlib
 import asyncio
+from typing import Optional
+from dotenv import load_dotenv
+
+import chainlit as cl
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 
-# 1. 데이터 레이어 (DB 활성화)
+load_dotenv()
 
+SYS_BOT = "JobPocket"
+
+# ==========================================
+# 1. 데이터 레이어 (대화 기록 DB)
+# ==========================================
 @cl.data_layer  
 def setup_data_layer():
     return SQLAlchemyDataLayer(conninfo="sqlite+aiosqlite:///local_chat_history.db")
 
-# 2. 사용자 인증
-
+# ==========================================
+# 2. 사용자 인증 (SQLite 연동)
+# ==========================================
 @cl.password_auth_callback
-async def auth_callback(username: str, password: str):
-    return cl.User(identifier=username)
+async def auth_callback(username: str, password: str) -> Optional[cl.User]:
+    # SQLite 연결 (init_user_db.py로 생성한 DB)
+    conn = sqlite3.connect('user_data.db')
+    cursor = conn.cursor()
 
-SYS_BOT = "doraemon"
+    cursor.execute('SELECT password, role FROM users WHERE username = ?', (username, ))
+    result = cursor.fetchone()
+    conn.close()
 
-# 3. 모델 선택 토글 (아이콘 경로 수정 완료)
+    if result:
+        stored_password, role = result
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        
+        if hashed_password == stored_password:
+            return cl.User(
+                identifier=username, 
+                metadata={"role": role, "provider": "credentials"}
+            )
+    return None
 
+# ==========================================
+# 3. 모델 선택 토글
+# ==========================================
 @cl.set_chat_profiles
 async def chat_profile():
     model_icon_path = "/public/models.png" 
@@ -40,27 +68,41 @@ async def chat_profile():
         )
     ]
 
+# ==========================================
 # 4. 채팅 시작 로직
-
+# ==========================================
 @cl.on_chat_start
 async def on_chat_start():
-    # 선택된 프로필 설정
+    # 🌟 핵심 방어 로직: 이미 초기화된 세션이면 여기서 함수를 종료(return)합니다.
+    if cl.user_session.get("is_initialized"):
+        return 
+        
+    # 초기화가 안 된 상태라면 플래그를 True로 켭니다.
+    cl.user_session.set("is_initialized", True)
+
+    # 로그인한 사용자 정보 가져오기
+    app_user = cl.user_session.get("user")
+    
+    # 세션 상태 초기화
     chat_profile = cl.user_session.get("chat_profile")
     cl.user_session.set("model", chat_profile)
     cl.user_session.set("step", 1)
     cl.user_session.set("draft_history", [])
 
-    # 시작할 때 큰 이미지를 보여주고 싶다 ? 해제
-    # welcome_image = cl.Image(path="./public/models.png", name="welcome", display="inline")
+    # 환영 메시지
+    welcome_message = f"""
+## 🫧 JobPocket ({chat_profile})
+반갑습니다, **{app_user.identifier}**님!
 
-    await cl.Message(
-        content=f"## 🫧 ReGPT ({chat_profile})\n\n지원자 상세 정보를 입력해주세요. 저는 안내 및 이력서 첨삭을 도와드릴 시스템입니다.",
-        author=SYS_BOT,
-        # elements=[welcome_image] # 이미지를 크게 띄우고 싶을 때 
-    ).send()
+지원자 상세 정보를 입력해주세요. 
+저는 안내 및 이력서 첨삭을 도와드릴 시스템입니다.
+    """
+    
+    await cl.Message(content=welcome_message, author=SYS_BOT).send()
 
-# 5. 메시지 처리 로직
-
+# ==========================================
+# 5. 메시지 처리 로직 (UI 시나리오)
+# ==========================================
 @cl.on_message
 async def on_message(message: cl.Message):
     step = cl.user_session.get("step")
@@ -73,6 +115,7 @@ async def on_message(message: cl.Message):
         await draft_msg.send()
 
         try:
+            # 💡 향후 여기에 LCEL Chain (ChatOpenAI 등) 로직을 결합하면 됩니다.
             dummy_text = "이것은 가짜 이력서 초안입니다. UI 테스트 중입니다.\n\n- 목표: UI 테스트\n- 결과: 성공적"
             
             for char in dummy_text:
@@ -83,7 +126,6 @@ async def on_message(message: cl.Message):
             draft_history.append({"role": "assistant", "content": draft_msg.content})
             cl.user_session.set("draft_history", draft_history)
 
-            # 액션 버튼 전송
             await cl.Message(
                 content="초안 확인 후 선택하세요",
                 author=SYS_BOT,
@@ -96,8 +138,9 @@ async def on_message(message: cl.Message):
         except Exception as e:
             await cl.Message(content=f"❌ 오류 발생: {str(e)}", author=SYS_BOT).send()
 
+# ==========================================
 # 6. 버튼 액션 콜백
-
+# ==========================================
 @cl.action_callback("finalize_draft")
 async def on_finalize(action: cl.Action):
     cl.user_session.set("step", 2)

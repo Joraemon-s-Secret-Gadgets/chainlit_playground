@@ -1,6 +1,14 @@
-# 🚀 JobPocket
+# Welcome to Chainlit! 🚀🤖
 
-이 AI는 자기소개서 작성에 특화된 AI 입니다.
+Hi there, Developer! 👋 We're excited to have you on board. Chainlit is a powerful tool designed to help you prototype, debug and share applications built on top of LLMs.
 
-AI가 사용하는 어투는 피하고, 글자 수는 범위내로 작성하며, 본인의 경험이 아니거나 과장된 내용을 필터링합니다.
-또한 추상적인 표현, 문맥 흐름이 어색한 부분들을 집중 파악합니다.
+## Useful Links 🔗
+
+- **Documentation:** Get started with our comprehensive [Chainlit Documentation](https://docs.chainlit.io) 📚
+- **Discord Community:** Join our friendly [Chainlit Discord](https://discord.gg/k73SQ3FyUh) to ask questions, share your projects, and connect with other developers! 💬
+
+We can't wait to see what you create with Chainlit! Happy coding! 💻😊
+
+## Welcome screen
+
+To modify the welcome screen, edit the `chainlit.md` file at the root of your project. If you do not want a welcome screen, just leave this file empty.
