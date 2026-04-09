@@ -2,25 +2,22 @@ import chainlit as cl
 import asyncio
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 
-# ==========================================
 # 1. 데이터 레이어 (DB 활성화)
-# ==========================================
+
 @cl.data_layer  
 def setup_data_layer():
     return SQLAlchemyDataLayer(conninfo="sqlite+aiosqlite:///local_chat_history.db")
 
-# ==========================================
 # 2. 사용자 인증
-# ==========================================
+
 @cl.password_auth_callback
 async def auth_callback(username: str, password: str):
     return cl.User(identifier=username)
 
-SYS_BOT = "Doraemon"
+SYS_BOT = "doraemon"
 
-# ==========================================
 # 3. 모델 선택 토글 (아이콘 경로 수정 완료)
-# ==========================================
+
 @cl.set_chat_profiles
 async def chat_profile():
     model_icon_path = "/public/models.png" 
@@ -43,9 +40,8 @@ async def chat_profile():
         )
     ]
 
-# ==========================================
 # 4. 채팅 시작 로직
-# ==========================================
+
 @cl.on_chat_start
 async def on_chat_start():
     # 선택된 프로필 설정
@@ -63,9 +59,8 @@ async def on_chat_start():
         # elements=[welcome_image] # 이미지를 크게 띄우고 싶을 때 
     ).send()
 
-# ==========================================
 # 5. 메시지 처리 로직
-# ==========================================
+
 @cl.on_message
 async def on_message(message: cl.Message):
     step = cl.user_session.get("step")
@@ -93,17 +88,16 @@ async def on_message(message: cl.Message):
                 content="초안 확인 후 선택하세요",
                 author=SYS_BOT,
                 actions=[
-                    cl.Action(name="finalize_draft", payload={"action": "finalize"}, label="⭐ 확정"),
-                    cl.Action(name="continue_edit", payload={"action": "continue"}, label="🔄 수정")
+                    cl.Action(name="finalize_draft", payload={"action": "finalize"}, label="☑️ 확정"),
+                    cl.Action(name="continue_edit", payload={"action": "continue"}, label="🪄 수정")
                 ]
             ).send()
 
         except Exception as e:
             await cl.Message(content=f"❌ 오류 발생: {str(e)}", author=SYS_BOT).send()
 
-# ==========================================
 # 6. 버튼 액션 콜백
-# ==========================================
+
 @cl.action_callback("finalize_draft")
 async def on_finalize(action: cl.Action):
     cl.user_session.set("step", 2)

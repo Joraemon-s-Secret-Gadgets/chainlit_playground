@@ -45,7 +45,7 @@ enabled = true
 allowed_executables = ["npx", "uvx"]
 
 [UI]
-name = "Assistant"
+name = "JobPocket"
 
 # 사이드바 강제 활성화
 default_sidebar_state = "open"
