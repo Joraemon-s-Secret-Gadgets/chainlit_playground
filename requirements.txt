@@ -1,6 +1,5 @@
-chainlit>=1.1.0
-SQLAlchemy>=2.0.0
+chainlit>=1.1.306
+python-dotenv>=1.0.1
 aiosqlite>=0.20.0
-
-# 추후 OpenAI 연동 시 활성화
-# openai>=1.10.0
+SQLAlchemy>=2.0.30
+pandas>=2.2.2

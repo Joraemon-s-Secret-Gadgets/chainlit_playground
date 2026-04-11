@@ -1,14 +1,6 @@
-# Welcome to Chainlit! 🚀🤖
+# 환영합니다! AI 자소서 첨삭 어시스턴트입니다.
 
-Hi there, Developer! 👋 We're excited to have you on board. Chainlit is a powerful tool designed to help you prototype, debug and share applications built on top of LLMs.
+앱에 접근하려면 로그인하세요.
+아직 계정이 없으신가요? 
 
-## Useful Links 🔗
-
-- **Documentation:** Get started with our comprehensive [Chainlit Documentation](https://docs.chainlit.io) 📚
-- **Discord Community:** Join our friendly [Chainlit Discord](https://discord.gg/k73SQ3FyUh) to ask questions, share your projects, and connect with other developers! 💬
-
-We can't wait to see what you create with Chainlit! Happy coding! 💻😊
-
-## Welcome screen
-
-To modify the welcome screen, edit the `chainlit.md` file at the root of your project. If you do not want a welcome screen, just leave this file empty.
+👉 **[여기에서 회원가입 하기](/signup)**

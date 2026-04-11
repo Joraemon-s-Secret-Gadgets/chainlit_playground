@@ -13,7 +13,7 @@ latex = false
 user_message_markdown = true
 user_message_autoscroll = true
 assistant_message_autoscroll = true
-auto_tag_thread = true
+auto_tag_thread = false
 edit_message = true
 allow_thread_sharing = false
 favorites = false
@@ -46,7 +46,8 @@ allowed_executables = ["npx", "uvx"]
 
 [UI]
 name = "JobPocket"
-login_page_image = "/public/logo_dark.png"
+login_page_image = "/public/logo_light.png"
+default_theme = "light"
 
 # 사이드바 강제 활성화
 default_sidebar_state = "open"
