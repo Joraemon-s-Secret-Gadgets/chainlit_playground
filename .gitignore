@@ -1,0 +1,16 @@
+# Python 임시 파일
+__pycache__/
+*.py[cod]
+
+# 로컬 DB 및 환경변수
+*.db
+.env
+.venv/
+venv/
+
+# 에디터 설정
+.vscode/
+.DS_Store
+
+# Chainlit 관련 (필요하면 제외)
+# .chainlit/

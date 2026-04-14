@@ -1,0 +1,5 @@
+chainlit>=1.1.306
+python-dotenv>=1.0.1
+aiosqlite>=0.20.0
+SQLAlchemy>=2.0.30
+pandas>=2.2.2
