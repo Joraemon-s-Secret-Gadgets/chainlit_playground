@@ -7,8 +7,11 @@ import json
 import base64
 import os
 import random
+from database import save_chat_message, load_chat_history, delete_chat_history
 
-# 페이지 기본 설정
+# ==========================================
+# 페이지 기본 설정 및 초기화
+# ==========================================
 st.set_page_config(page_title="JobPocket", page_icon="public/logo_light.png", layout="wide")
 db.init_db()
 
@@ -19,11 +22,7 @@ if "messages" not in st.session_state: st.session_state.messages = []
 if "page" not in st.session_state: st.session_state.page = "login"
 if "menu" not in st.session_state: st.session_state.menu = "chat"
 if "reset_email" not in st.session_state: st.session_state.reset_email = None
-
-# [추가됨] 모델 선택 세션
 if "selected_model" not in st.session_state: st.session_state.selected_model = "GPT-4o-mini"
-
-# 비밀번호 재설정 인증용 세션
 if "reset_code" not in st.session_state: st.session_state.reset_code = None
 if "code_verified" not in st.session_state: st.session_state.code_verified = False
 
@@ -86,11 +85,10 @@ def display_header(title):
             </div>
         """, unsafe_allow_html=True)
 
-# 커스텀 CSS 적용
 apply_custom_css()
 
 # ==========================================
-# 1. 인증 뷰
+# 1. 인증 뷰 (로그인 / 회원가입 / 비밀번호)
 # ==========================================
 def login_view():
     display_header("로그인")
@@ -205,7 +203,7 @@ def reset_password_view():
                         st.error("처리 중 오류가 발생했습니다.")
 
 # ==========================================
-# 2. 메인 서비스
+# 2. 메인 서비스 (보관함 및 채팅 뷰)
 # ==========================================
 def mypage_view():
     display_header("내 스펙 보관함")
@@ -253,67 +251,99 @@ def mypage_view():
                 st.rerun()
 
 def chat_view():
+    # 찌꺼기 버튼 코드 삭제 완료, 헤더만 출력
     display_header("JobPocket")
+    user_email = st.session_state.user_info[2] 
 
+    # 환영 창 표시 여부
+    if "show_welcome" not in st.session_state:
+        st.session_state.show_welcome = not bool(st.session_state.messages)
+
+    if st.session_state.show_welcome:
+        user_name = st.session_state.user_info[0] 
+
+        st.markdown(f"""
+        <div style="background-color: #F0F8FF; padding: 2.5rem; border-radius: 15px; text-align: center; border: 2px solid #3B82F6; margin-top: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2 style="color: #3B82F6; margin-bottom: 1rem; font-weight: 800;">반갑습니다, {user_name}님! 👋</h2>
+            <p style="font-size: 1.2rem; color: #333; margin-bottom: 1.5rem;"><strong>JobPocket</strong>이 여러분의 합격 여정을 함께합니다.</p>
+            <div style="text-align: left; display: inline-block; margin-bottom: 2rem; color: #555; font-size: 1.05rem; line-height: 2;">
+                🚀 <b>내 스펙 기반:</b> 입력한 경험을 바탕으로 팩트 중심 초안 생성<br>
+                🤖 <b>듀얼 모델 지원:</b> GPT-4o-mini와 Groq(Llama3) 선택 가능<br>
+                📝 <b>실시간 첨삭:</b> AI의 날카로운 피드백과 가독성 높은 코드박스 제공
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        _, col_btn, _ = st.columns([1, 1, 1])
+        with col_btn:
+            if st.button("🚀 대화 시작하기", use_container_width=True, type="primary"):
+                st.session_state.show_welcome = False
+                
+                if not st.session_state.messages:
+                    greeting = "안녕하세요! 지원하시려는 **회사와 직무**, 그리고 **자기소개서 문항**을 편하게 남겨주세요. 보관함에 등록해 두신 스펙을 꼼꼼히 분석해서 맞춤형 자소서 초안을 작성해 드리겠습니다. 😊"
+                    st.session_state.messages.append({"role": "assistant", "content": greeting})
+                    save_chat_message(user_email, "assistant", greeting)
+                
+                st.rerun()
+        return
+
+    # 채팅 메시지 출력
     for i, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"], avatar=USER_AVATAR if message["role"] == "user" else AI_AVATAR):
             content = message["content"]
 
             if message["role"] == "assistant" and "[자소서 초안]" in content:
-                
                 st.markdown(content)
-
                 try:
                     resume_text = content.split("[자소서 초안]")[1].split("[자소서 초안 평가]")[0].strip()
-                    
                     st.divider() 
                     st.caption("📋 아래 박스 우측 상단의 아이콘을 눌러 이력서 본문만 쉽게 복사하세요.")
                     st.code(resume_text, language="plaintext")
                 except IndexError:
                     pass
 
-                st.write("") 
-                col1, col2, col3 = st.columns([1.5, 1.5, 7])
-                
+                st.write("이 대답이 마음에 드시나요?") 
+                col1, col2, col3 = st.columns([0.4, 0.4, 9.4])
                 feedback_key = f"feedback_{i}"
                 if feedback_key not in st.session_state:
                     st.session_state[feedback_key] = None
 
                 if st.session_state[feedback_key] is None:
                     with col1:
-                        if st.button("👍", key=f"good_{i}", use_container_width=True):
+                        if st.button("👍", key=f"good_{i}"):
                             st.session_state[feedback_key] = "good"
                             st.rerun()
                     with col2:
-                        if st.button("👎", key=f"bad_{i}", use_container_width=True):
+                        if st.button("👎", key=f"bad_{i}"):
                             st.session_state[feedback_key] = "bad"
                             st.rerun()
                 else:
                     feedback_emoji = "👍" if st.session_state[feedback_key] == "good" else "👎"
-                    st.caption(f"✓ AI 초안 평가 완료: **{feedback_emoji}** (소중한 피드백 감사합니다!)")
-
+                    st.caption(f"✓ AI 초안 평가 완료: **{feedback_emoji}**")
             else:
                 st.markdown(content)    
 
+    # 채팅 입력창
     if prompt := st.chat_input("지원하실 회사와 직무, 자기소개서의 문항을 작성해주세요!"):
         st.session_state.messages.append({"role": "user", "content": prompt})
+        save_chat_message(user_email, "user", prompt)
+        
         with st.chat_message("user", avatar=USER_AVATAR): 
             st.markdown(prompt)
         
         with st.chat_message("assistant", avatar=AI_AVATAR):
-            # 선택된 모델 정보를 파라미터로 넘겨줍니다.
             response = st.write_stream(generate_ai_feedback_stream(
                 prompt, 
                 st.session_state.user_info, 
                 st.session_state.selected_model
             ))
             st.session_state.messages.append({"role": "assistant", "content": response})
+            save_chat_message(user_email, "assistant", response)
         
-        # [핵심 Rerun 패치] 화면을 새로고침해야 복사/피드백 UI가 곧바로 생성됩니다.
         st.rerun()
 
 # ==========================================
-# 3. 메인 라우팅 (사이드바)
+# 3. 메인 라우팅 및 사이드바
 # ==========================================
 if not st.session_state.logged_in:
     if st.session_state.page == "login": login_view()
@@ -321,36 +351,71 @@ if not st.session_state.logged_in:
     elif st.session_state.page == "find_password": find_password_view()
     elif st.session_state.page == "reset_password": reset_password_view()
 else:
-    st.sidebar.markdown("<br>", unsafe_allow_html=True)
-    img_path = "public/logo_light.png"
-    if os.path.exists(img_path):
-        with open(img_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-        st.sidebar.markdown(f"""
-            <div style="display:flex; justify-content:center; align-items:center; margin-bottom: 20px;">
-                <img src="data:image/png;base64,{encoded_string}" width="160" style="border-radius:20px;">
-            </div>
-        """, unsafe_allow_html=True)
-    
-    # [수정됨] 이름 깨짐 원인이었던 안전하지 않은 html 코드를 제거하고 기본 안전 마크다운으로 출력합니다 (db 구조상 인덱스 0번에 이름이 들어감)
-    st.sidebar.markdown(f"### 👤 {st.session_state.user_info[0]}님")
-    st.sidebar.divider()
-    
-    # [추가됨] 모델 선택 UI 추가
-    st.sidebar.caption("🧠 AI 모델 설정")
-    st.session_state.selected_model = st.sidebar.selectbox(
-        "사용할 엔진을 선택하세요",
-        ["GPT-4o-mini", "GPT-OSS-120B (Groq)"],
-        index=0 if st.session_state.selected_model == "GPT-4o-mini" else 1,
-        label_visibility="collapsed"
-    )
-    st.sidebar.divider()
-    
-    menu = st.sidebar.radio("메뉴 이동", ["💬 AI 자소서 첨삭", "👤 내 스펙 보관함"])
-    
-    st.sidebar.markdown("<br>", unsafe_allow_html=True)
-    if st.sidebar.button("로그아웃", use_container_width=True):
-        st.session_state.clear(); st.rerun()
+    user_email = st.session_state.user_info[2]
+    user_name = st.session_state.user_info[0]
+
+    # [수정] DB 조회 로직을 최상단으로 빼서 메인/사이드바 중복 호출 방지
+    if "history_loaded" not in st.session_state:
+        st.session_state.messages = load_chat_history(user_email)
+        st.session_state.history_loaded = True
+        if st.session_state.messages:
+            st.session_state.show_welcome = False
+
+    # --- 사이드바 구성 ---
+    with st.sidebar:
+        # 1. 로고
+        img_path = "public/logo_light.png"
+        if os.path.exists(img_path):
+            with open(img_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+            st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{encoded}" width="130" style="border-radius:15px; margin-bottom:20px;"></div>', unsafe_allow_html=True)
         
-    if "AI 자소서 첨삭" in menu: chat_view()
-    else: mypage_view()
+        # 2. 프로필 & 로그아웃
+        st.markdown(f"### 👤 {user_name}님")
+        if st.button("로그아웃", use_container_width=True, key="logout_sidebar"):
+            st.session_state.clear()
+            st.rerun()
+        
+        st.divider()
+
+        # 3. 메뉴 및 모델 설정
+        menu = st.radio("메뉴 이동", ["💬 AI 자소서 첨삭", "👤 내 스펙 보관함"])
+        
+        st.write("")
+        st.caption("🧠 AI 모델 설정")
+        st.session_state.selected_model = st.selectbox(
+            "엔진 선택",
+            ["GPT-4o-mini", "GPT-OSS-120B (Groq)"],
+            index=0 if st.session_state.selected_model == "GPT-4o-mini" else 1,
+            label_visibility="collapsed"
+        )
+        
+        st.divider()
+
+        # 4. 대화 기록 히스토리 (ChatGPT 스타일)
+        # 글씨와 초기화 버튼을 한 줄에 깔끔하게 배치
+        col_hist_title, col_hist_btn = st.columns([7, 3])
+        with col_hist_title:
+            st.markdown("#### 📝 대화 기록")
+        with col_hist_btn:
+            if st.button("🗑️", key="clear_all_btn", use_container_width=True):
+                delete_chat_history(user_email)
+                st.session_state.messages = []
+                st.session_state.show_welcome = True
+                st.rerun()
+
+        # 대화 기록 리스트 출력 (텍스트만 깔끔하게)
+        if st.session_state.messages:
+            user_questions = [m for m in st.session_state.messages if m["role"] == "user"]
+            with st.container(height=300):
+                for i, q in enumerate(reversed(user_questions)):
+                    short_q = q['content'][:15] + "..." if len(q['content']) > 15 else q['content']
+                    st.markdown(f"<div style='padding:5px 0; font-size:0.9em; color:#555;'>💬 {short_q}</div>", unsafe_allow_html=True)
+        else:
+            st.caption("대화 기록이 없습니다.")
+
+    # --- 메인 화면 출력 ---
+    if "AI 자소서 첨삭" in menu:
+        chat_view()
+    else:
+        mypage_view()
