@@ -1,4 +1,4 @@
-# auth.py
+# backend/auth.py
 import hashlib
 import secrets
 
