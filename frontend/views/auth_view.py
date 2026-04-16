@@ -1,3 +1,4 @@
+# ~/frontend/views/auth_view.py
 import streamlit as st
 import time
 import random

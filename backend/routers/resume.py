@@ -1,85 +1,31 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Any
 import database as db
-from services import chat_logic
 
 router = APIRouter()
 
-class ChatMessage(BaseModel):
-    email: str
-    role: str
-    content: str
+# 프론트엔드에서 넘어오는 JSON 데이터 구조 정의
+class ResumeData(BaseModel):
+    personal: dict
+    education: dict
+    additional: dict
 
-class StepParseReq(BaseModel):
-    prompt: str
-    model: str
+# 스펙 불러오기 (GET)
+@router.get("/{email}")
+def get_resume(email: str):
+    user = db.get_user(email)
+    # user[4]에 resume_data가 들어 있습니다. 데이터가 없으면 빈 JSON 문자열 반환
+    if user and user[4]:
+        return {"resume": user[4]}
+    return {"resume": "{}"}
 
-class StepDraftReq(BaseModel):
-    prompt: str
-    user_info: List[Any]
-    model: str
-
-class StepRefineReq(BaseModel):
-    draft: str
-    prompt: str
-    model: str
-
-class StepFitReq(BaseModel):
-    refined: str
-    prompt: str
-    model: str
-
-class StepFinalReq(BaseModel):
-    adjusted: str
-    prompt: str
-    model: str
-
-# --- 대화 기록 관리 ---
-@router.get("/history/{email}")
-def get_history(email: str):
-    messages = db.load_chat_history(email)
-    return {"messages": messages}
-
-@router.post("/message")
-def save_message(req: ChatMessage):
-    db.save_chat_message(req.email, req.role, req.content)
-    return {"status": "success"}
-
-@router.delete("/history/{email}")
-def delete_history(email: str):
-    db.delete_chat_history(email)
-    return {"status": "success"}
-
-# --- 4단계 AI 생성 로직 ---
-@router.post("/step-parse")
-def step_parse(req: StepParseReq):
-    parsed = chat_logic.parse_user_request(req.prompt, req.model)
-    return parsed
-
-@router.post("/step-draft")
-def step_draft(req: StepDraftReq):
-    # tuple 타입 변환 (FastAPI에서 list로 받음)
-    draft = chat_logic.regenerate_local_draft_if_needed(req.prompt, tuple(req.user_info), req.model)
-    return {"draft": draft}
-
-@router.post("/step-refine")
-def step_refine(req: StepRefineReq):
-    try:
-        refined = chat_logic.refine_with_api(req.draft, req.prompt, req.model)
-    except Exception:
-        refined = req.draft
-    return {"refined": refined}
-
-@router.post("/step-fit")
-def step_fit(req: StepFitReq):
-    try:
-        adjusted = chat_logic.fit_length_if_needed(req.refined, req.prompt, req.model)
-    except Exception:
-        adjusted = req.refined
-    return {"adjusted": adjusted}
-
-@router.post("/step-final")
-def step_final(req: StepFinalReq):
-    final_response = chat_logic.build_final_response(req.adjusted, req.prompt, req.model)
-    return {"final_response": final_response}
+# 스펙 저장하기 (PUT)
+@router.put("/{email}")
+def update_resume(email: str, data: ResumeData):
+    # Pydantic 모델을 딕셔너리로 변환 후 기존 DB 함수에 바로 전달
+    success = db.update_resume_data(email, data.model_dump())
+    
+    if success:
+        return {"status": "success"}
+    else:
+        raise HTTPException(status_code=500, detail="이력서 업데이트에 실패했습니다.")

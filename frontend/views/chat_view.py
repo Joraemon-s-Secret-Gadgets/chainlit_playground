@@ -1,3 +1,4 @@
+# ~/frontend/views/chat_view.py
 import streamlit as st
 import time
 from utils import api_client
