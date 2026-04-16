@@ -102,7 +102,10 @@ def chat_view():
             if st.button("🚀 대화 시작하기", use_container_width=True, type="primary"):
                 st.session_state.show_welcome = False
                 if not st.session_state.messages:
-                    greeting = "안녕하세요! 지원하시려는 **회사와 직무**, 그리고 **자기소개서 문항**을 편하게 남겨주세요. 보관함에 등록해 두신 스펙을 바탕으로 맞춤형 자소서 초안을 작성해 드리겠습니다. 😊"
+                    greeting = """안녕하세요! 👋
+지원하시려는 **회사와 직무**, 그리고 **자기소개서 문항**을 편하게 남겨주세요. 
+
+보관함에 등록해 두신 스펙을 바탕으로 **자소서 초안**을 작성해 드리겠습니다. 😊"""
                     st.session_state.messages.append({"role": "assistant", "content": greeting})
                     api_client.save_chat_message_api(user_email, "assistant", greeting)
                 st.rerun()
@@ -115,7 +118,7 @@ def chat_view():
             else:
                 st.markdown(message["content"])
 
-    if prompt := st.chat_input("지원하실 회사와 직무, 자기소개서의 문항을 작성해주세요!"):
+    if prompt := st.chat_input("지원하실 회사와 직무, 자기소개서의 문항(ex.지원 동기, 포부, 회사 비전, 갈등 해결 등)을 작성해주세요!"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         api_client.save_chat_message_api(user_email, "user", prompt)
 

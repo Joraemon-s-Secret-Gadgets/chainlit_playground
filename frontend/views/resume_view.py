@@ -7,7 +7,7 @@ from utils.ui_components import display_header
 
 def mypage_view():
     display_header("내 스펙 보관함")
-    st.caption("면접관에게 어필할 객관적인 '팩트'만 입력해 주세요. 스토리는 AI가 대화로 끌어내 줍니다.")
+    st.caption("면접관에게 어필할 객관적인 '팩트'만 입력해 주세요. 부족한 스토리는 AI가 대화로 끌어내 줍니다.")
     
     user_email = st.session_state.user_info[2]
     resume_str = api_client.get_user_resume_api(user_email)

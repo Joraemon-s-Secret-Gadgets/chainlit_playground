@@ -8,7 +8,7 @@ def apply_custom_css():
         /* 1. 하단 푸터 숨기기 */
         footer {visibility: hidden !important;}
         
-        /* 🔥 2. 상단 헤더(stHeader)는 아예 건드리지 않습니다! (버튼 무조건 생존 보장) 🔥 */
+        /* 2. 상단 헤더(stHeader) */
         
         /* 3. 우측에 거슬리는 요소만 아주 정밀하게 타격해서 삭제 */
         .stAppDeployButton {display: none !important;} /* Deploy 버튼 */
