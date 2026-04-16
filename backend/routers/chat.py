@@ -1,7 +1,6 @@
-# ~/backend/routers/chat.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import List, Any
+from typing import List, Any, Optional
 import database as db
 from services import chat_logic
 
@@ -21,6 +20,11 @@ class StepDraftReq(BaseModel):
     user_info: List[Any]
     model: str
 
+class StepReviseReq(BaseModel):
+    existing_draft: str
+    revision_request: str
+    model: str
+
 class StepRefineReq(BaseModel):
     draft: str
     prompt: str
@@ -35,8 +39,9 @@ class StepFinalReq(BaseModel):
     adjusted: str
     prompt: str
     model: str
+    result_label: str = "자소서 초안"
+    change_summary: Optional[str] = None
 
-# --- 대화 기록 관리 ---
 @router.get("/history/{email}")
 def get_history(email: str):
     messages = db.load_chat_history(email)
@@ -52,17 +57,19 @@ def delete_history(email: str):
     db.delete_chat_history(email)
     return {"status": "success"}
 
-# --- 4단계 AI 생성 로직 ---
 @router.post("/step-parse")
 def step_parse(req: StepParseReq):
-    parsed = chat_logic.parse_user_request(req.prompt, req.model)
-    return parsed
+    return chat_logic.parse_user_request(req.prompt, req.model)
 
 @router.post("/step-draft")
 def step_draft(req: StepDraftReq):
-    # tuple 타입 변환 (FastAPI에서 list로 받음)
     draft = chat_logic.regenerate_local_draft_if_needed(req.prompt, tuple(req.user_info), req.model)
     return {"draft": draft}
+
+@router.post("/step-revise")
+def step_revise(req: StepReviseReq):
+    revised = chat_logic.revise_existing_draft(req.existing_draft, req.revision_request, req.model)
+    return {"revised": revised}
 
 @router.post("/step-refine")
 def step_refine(req: StepRefineReq):
@@ -82,5 +89,11 @@ def step_fit(req: StepFitReq):
 
 @router.post("/step-final")
 def step_final(req: StepFinalReq):
-    final_response = chat_logic.build_final_response(req.adjusted, req.prompt, req.model)
+    final_response = chat_logic.build_final_response(
+        body=req.adjusted,
+        user_message=req.prompt,
+        selected_model=req.model,
+        result_label=req.result_label,
+        change_summary=req.change_summary,
+    )
     return {"final_response": final_response}
