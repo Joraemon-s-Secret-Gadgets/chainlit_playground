@@ -66,17 +66,20 @@ else:
                 unsafe_allow_html=True,
             )
 
-        st.markdown(f"### 👤 {user_name}님")
+        # 👤 전종혁님 버튼 (내 스펙 보관함)
+        with st.popover(f"👤 {user_name}님", use_container_width=True):
+            if st.button("📁 내 스펙 보관함", use_container_width=True):
+                st.session_state.menu = "resume"
+                st.rerun()
 
-        if st.button("로그아웃", use_container_width=True, key="logout_sidebar"):
-            st.session_state.clear()
+        # 채팅 메뉴 이동 버튼
+        if st.button("💬 새 채팅 (AI 자소서 첨삭)", use_container_width=True):
+            st.session_state.menu = "chat"
             st.rerun()
-
-        st.divider()
-        menu = st.radio("메뉴 이동", ["💬 AI 자소서 첨삭", "👤 내 스펙 보관함"])
-
+            
         st.write("")
         st.caption("🧠 AI 모델 설정")
+        # ✨ 새 채팅 아래에 원래대로 AI 모델 선택기 배치
         st.session_state.selected_model = st.selectbox(
             "엔진 선택",
             ["GPT-4o-mini", "GPT-OSS-120B (Groq)"],
@@ -84,7 +87,7 @@ else:
             label_visibility="collapsed",
         )
 
-        st.divider()
+        # 대화기록
         col_hist_title, col_hist_btn = st.columns([7, 3])
         with col_hist_title:
             st.markdown("#### 📝 대화 기록")
@@ -108,7 +111,14 @@ else:
         else:
             st.caption("대화 기록이 없습니다.")
 
-    if "AI 자소서 첨삭" in menu:
+        # 로그아웃 하단 고정
+        st.markdown('<div class="sidebar-bottom-spacer"></div>', unsafe_allow_html=True)
+        if st.button("로그아웃", use_container_width=True, key="logout_sidebar"):
+            st.session_state.clear()
+            st.rerun()
+
+    # 메인 뷰 라우팅
+    if st.session_state.menu == "chat":
         chat_view.chat_view()
     else:
         resume_view.mypage_view()
