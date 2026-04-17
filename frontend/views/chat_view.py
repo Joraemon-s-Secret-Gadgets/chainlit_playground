@@ -1,16 +1,16 @@
 import re
 import time
-from typing import List
 import streamlit as st
 from utils import api_client
-from utils.ui_components import display_header
 
 AI_AVATAR = "public/logo_light.png"
 USER_AVATAR = "👤"
 
+
 def get_result_label(content: str) -> str:
     match = re.search(r"^\[(.+?)\]", content.strip())
     return match.group(1) if match else ""
+
 
 def get_last_assistant_result() -> str:
     for msg in reversed(st.session_state.messages):
@@ -21,6 +21,7 @@ def get_last_assistant_result() -> str:
             return msg["content"]
     return ""
 
+
 def extract_resume_text(content: str) -> str:
     try:
         title_match = re.search(r"^\[(.+?)\]\s*", content.strip())
@@ -28,6 +29,7 @@ def extract_resume_text(content: str) -> str:
             return content.strip()
 
         remaining = content.strip()[title_match.end():].lstrip()
+
         if remaining.startswith("반영 사항:"):
             lines = remaining.splitlines()
             remaining = "\n".join(lines[1:]).lstrip()
@@ -40,11 +42,13 @@ def extract_resume_text(content: str) -> str:
     except Exception:
         return content.strip()
 
+
 def extract_evaluation_text(content: str) -> str:
     split_token = "[평가 및 코멘트]"
     if split_token not in content:
         return ""
     return content.split(split_token, 1)[1].strip()
+
 
 def parse_evaluation_for_display(evaluation_text: str) -> dict:
     result = {"rating": "", "reason": "", "points": []}
@@ -61,55 +65,36 @@ def parse_evaluation_for_display(evaluation_text: str) -> dict:
             result["reason"] = line.replace("이유:", "").strip()
         elif line.startswith("보완 포인트"):
             point_mode = True
-        elif point_mode and line.startswith("-"):
-            result["points"].append(line.lstrip("-").strip())
+        elif point_mode and (line.startswith("-") or line.startswith("•")):
+            result["points"].append(line.lstrip("-•").strip())
+
     return result
 
-def build_dynamic_recommendations(
-    evaluation_points: List[str],
-    question_type: str,
-    has_char_limit: bool,
-) -> List[tuple[str, str]]:
-    recommendations = []
 
-    for point in evaluation_points[:2]:
-        if "첫 문장" in point:
-            recommendations.append(("첫 문장 구체화", "이 결과의 첫 문장이 더 구체적이고 선명하게 드러나도록 수정해줘."))
-        elif "마지막 문단" in point:
-            recommendations.append(("마지막 문단 구체화", "이 결과의 마지막 문단을 더 구체적으로 수정해줘."))
-        elif "사례" in point or "연결" in point:
-            recommendations.append(("경험 연결 강화", "이 결과에서 경험과 직무의 연결이 더 분명하게 드러나도록 수정해줘."))
-        elif "직무" in point:
-            recommendations.append(("직무 적합성 강화", "이 결과가 지원 직무와 더 잘 맞아 보이도록 수정해줘."))
-        elif "지원 이유" in point or "지원동기" in point:
-            recommendations.append(("지원동기 강화", "이 결과에서 지원동기가 더 또렷하게 드러나도록 수정해줘."))
-        elif "구체성" in point:
-            recommendations.append(("더 구체적으로", "이 결과를 조금 더 구체적으로 수정해줘."))
-        elif "과장" in point:
-            recommendations.append(("더 담백하게", "이 결과를 더 담백하게 다듬어줘."))
+def point_to_revision_prompt(point: str) -> str:
+    point = point.strip()
 
-    if question_type == "motivation" and not any(label == "지원동기 강화" for label, _ in recommendations):
-        recommendations.append(("지원동기 강화", "이 결과에서 지원동기가 더 또렷하게 드러나도록 수정해줘."))
+    if "첫 문장" in point:
+        return "이 결과의 첫 문장이 더 선명하고 구체적으로 드러나도록 수정해줘."
+    if "마지막 문단" in point:
+        return "이 결과의 마지막 문단이 더 자연스럽고 현실적인 마무리가 되도록 수정해줘."
+    if "지원동기" in point or "지원 이유" in point:
+        return "이 결과에서 지원동기가 더 또렷하게 드러나도록 수정해줘."
+    if "갈등" in point and ("방식" in point or "해결" in point):
+        return "이 결과에서 갈등이 생긴 이유와 그것을 어떤 방식으로 조율하고 해결했는지가 더 분명히 드러나도록 수정해줘."
+    if "경험" in point and "연결" in point:
+        return "이 결과에서 내 경험과 지원 직무의 연결이 더 분명하게 드러나도록 수정해줘."
+    if "직무" in point:
+        return "이 결과가 지원 직무와 더 잘 맞아 보이도록 수정해줘."
+    if "구체" in point:
+        return "이 결과를 조금 더 구체적으로 보완해줘."
+    if "담백" in point or "과장" in point:
+        return "이 결과를 더 담백하고 과장 없는 문장으로 다듬어줘."
+    if "분량" in point or "글자 수" in point or "700자" in point:
+        return "이 결과를 글자 수 조건에 더 잘 맞도록 조정해줘."
 
-    if not any(label == "더 담백하게" for label, _ in recommendations):
-        recommendations.append(("더 담백하게", "이 결과를 더 담백하게 다듬어줘."))
+    return f"다음 보완 포인트를 반영해서 수정해줘: {point}"
 
-    if has_char_limit and not any("분량" in label or "줄이기" in label for label, _ in recommendations):
-        recommendations.append(("분량 맞추기", "이 결과를 글자 수 조건에 더 잘 맞도록 조정해줘."))
-    elif not any("줄이기" in label for label, _ in recommendations):
-        recommendations.append(("700자로 줄이기", "이 결과를 700자 내외로 줄여줘."))
-
-    if not any("마지막 문단" in label for label, _ in recommendations):
-        recommendations.append(("마지막 문단 수정", "이 결과의 마지막 문단만 다시 써줘."))
-
-    deduped = []
-    seen = set()
-    for label, prompt in recommendations:
-        if label not in seen:
-            deduped.append((label, prompt))
-            seen.add(label)
-
-    return deduped[:4]
 
 def build_change_summary_for_quick_action(prompt: str) -> str:
     if "첫 문장" in prompt:
@@ -124,68 +109,49 @@ def build_change_summary_for_quick_action(prompt: str) -> str:
         return "지원 이유가 더 또렷하게 드러나도록 수정했습니다."
     if "마지막 문단" in prompt:
         return "마지막 문단을 중심으로 수정했습니다."
-    if "구체적" in prompt:
+    if "구체적" in prompt or "구체" in prompt:
         return "핵심 문장을 조금 더 구체적으로 보완했습니다."
     if "직무" in prompt:
         return "지원 직무와의 연결이 더 분명하게 드러나도록 수정했습니다."
     return "요청하신 방향을 반영해 수정했습니다."
 
-def render_followup_guidance(
-    message_index: int,
-    is_revision: bool,
-    recommendations: List[tuple[str, str]],
-):
-    title = "수정안이 반영되었습니다." if is_revision else "초안이 생성되었습니다."
-    body = "추가로 다듬고 싶은 문장이나 방향이 있으면 이어서 말씀해 주세요." if is_revision else "수정하고 싶은 문장이나 방향이 있으면 편하게 말씀해 주세요."
-    quick_label = "보완 포인트를 반영해 바로 수정해볼 수 있어요."
 
-    st.markdown(
-        f"""
-        <div class="followup-box">
-            <b style="font-size:1.05rem;">{title}</b><br>
-            {body}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.write("")
-    st.caption(quick_label)
-    cols = st.columns([1.2, 1.2, 1.2, 1.2])
-
-    for col, (label, prompt_text) in zip(cols, recommendations):
-        with col:
-            if st.button(label, key=f"quick_{message_index}_{label}", use_container_width=True):
-                st.session_state.pending_prompt = prompt_text
-                st.rerun()
-
-def render_evaluation_card(content: str):
+def render_evaluation_card(content: str, message_index: int):
     evaluation_text = extract_evaluation_text(content)
     parsed = parse_evaluation_for_display(evaluation_text)
 
     if not evaluation_text:
         return []
 
-    with st.container():
-        st.markdown('<div class="evaluation-card">', unsafe_allow_html=True)
-        st.markdown("**평가 및 코멘트**")
+    rating = parsed.get("rating", "")
+    reason = parsed.get("reason", "")
+    points = parsed.get("points", [])
 
-        rating = parsed.get("rating", "")
-        reason = parsed.get("reason", "")
-        points = parsed.get("points", [])
+    st.markdown("### 평가 및 코멘트")
 
-        if rating:
-            st.markdown(f"**평가 결과:** {rating}")
-        if reason:
-            st.markdown(f"**이유:** {reason}")
-        if points:
-            st.markdown("**보완 포인트**")
-            for point in points:
+    if rating:
+        st.markdown(f"**평가 결과:** {rating}")
+    if reason:
+        st.markdown(f"**이유:** {reason}")
+
+    if points:
+        st.markdown("**보완 포인트**")
+        for idx, point in enumerate(points):
+            col_text, col_btn = st.columns([5, 1.2])
+            with col_text:
                 st.markdown(f"- {point}")
-
-        st.markdown("</div>", unsafe_allow_html=True)
+            with col_btn:
+                prompt_text = point_to_revision_prompt(point)
+                if st.button(
+                    "적용",
+                    key=f"eval_btn_{message_index}_{idx}",
+                    use_container_width=True,
+                ):
+                    st.session_state.pending_prompt = prompt_text
+                    st.rerun()
 
     return points
+
 
 def render_assistant_message(content: str, message_index: int):
     label = get_result_label(content)
@@ -199,32 +165,18 @@ def render_assistant_message(content: str, message_index: int):
         st.write("")
         st.markdown(body_text)
 
-        evaluation_points = render_evaluation_card(content)
+        if label.endswith("수정안"):
+            st.caption("📋 최신 수정본입니다. 아래 탭을 열어 본문만 쉽게 복사하세요.")
+        else:
+            st.caption("📋 아래 탭을 열어 자소서 본문만 쉽게 복사하세요.")
+
+        with st.expander("📄 복사하기"):
+            st.code(body_text, language="plaintext")
 
         st.divider()
-        if label.endswith("수정안"):
-            st.caption("📋 최신 수정본입니다. 아래 박스 우측 상단 아이콘으로 본문만 쉽게 복사하세요.")
-        else:
-            st.caption("📋 아래 박스 우측 상단의 아이콘을 눌러 자소서 본문만 쉽게 복사하세요.")
-        st.code(body_text, language="plaintext")
 
-        parsed_request = (
-            api_client.parse_request_api(st.session_state.messages[message_index - 1]["content"], st.session_state.selected_model)
-            if message_index > 0
-            else {"question_type": "general", "char_limit": None}
-        )
-
-        recommendations = build_dynamic_recommendations(
-            evaluation_points=evaluation_points,
-            question_type=parsed_request.get("question_type", "general"),
-            has_char_limit=bool(parsed_request.get("char_limit")),
-        )
-
-        render_followup_guidance(
-            message_index=message_index,
-            is_revision=label.endswith("수정안"),
-            recommendations=recommendations,
-        )
+        # 평가 카드 안에서만 보완 버튼 처리
+        render_evaluation_card(content, message_index)
 
         st.write("")
         feedback_title = "이 수정안이 마음에 드시나요?" if label.endswith("수정안") else "이 초안이 마음에 드시나요?"
@@ -235,6 +187,7 @@ def render_assistant_message(content: str, message_index: int):
             st.session_state[feedback_key] = None
 
         center_cols = st.columns([4, 1, 1, 4])
+
         if st.session_state[feedback_key] is None:
             with center_cols[1]:
                 if st.button("👍", key=f"good_{message_index}", use_container_width=True):
@@ -253,6 +206,7 @@ def render_assistant_message(content: str, message_index: int):
     else:
         st.markdown(content)
 
+
 def render_progress_card():
     st.markdown("""
         <div class="progress-card">
@@ -264,6 +218,7 @@ def render_progress_card():
         </div>
     """, unsafe_allow_html=True)
 
+
 def is_revision_request(prompt: str) -> bool:
     revision_keywords = [
         "수정", "고쳐", "다듬", "줄여", "늘려", "바꿔", "다시 써",
@@ -271,6 +226,7 @@ def is_revision_request(prompt: str) -> bool:
         "톤", "문장", "700자", "500자", "1000자", "사례", "연결", "직무",
     ]
     return any(keyword in prompt for keyword in revision_keywords)
+
 
 def generate_response_with_progress(prompt: str, user_info: tuple, selected_model: str):
     status_box = st.empty()
@@ -343,6 +299,7 @@ def generate_response_with_progress(prompt: str, user_info: tuple, selected_mode
     step_box.empty()
     return final_response
 
+
 def process_prompt(prompt: str, user_email: str):
     st.session_state.messages.append({"role": "user", "content": prompt})
     api_client.save_chat_message_api(user_email, "user", prompt)
@@ -371,6 +328,7 @@ def process_prompt(prompt: str, user_email: str):
 
     st.rerun()
 
+
 def get_chat_input_placeholder() -> str:
     last_result = get_last_assistant_result()
     if not last_result:
@@ -382,8 +340,8 @@ def get_chat_input_placeholder() -> str:
         return "추가 수정 방향이나 문장 변경 요청을 말씀해 주세요!"
     return "지원 회사/직무/문항을 입력하거나, 수정 방향을 말씀해 주세요!"
 
+
 def chat_view():
-    display_header("JobPocket")
     user_email = st.session_state.user_info[2]
 
     if "show_welcome" not in st.session_state:
