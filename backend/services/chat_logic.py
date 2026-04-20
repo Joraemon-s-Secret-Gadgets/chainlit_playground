@@ -1,5 +1,7 @@
 import json
 import re
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,10 +12,33 @@ from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
+from langchain_huggingface import HuggingFaceEmbeddings
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 SAMPLE_PATH = BASE_DIR / "essay_samples.json"
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
+
+from retriever import HybridRetriever
+
+# -----------------------------
+# DB 연결 설정
+# -----------------------------
+
+DB_CONFIG = {
+    'host': os.getenv('HOST'),
+    'port': int(os.getenv('PORT')),
+    'user': os.getenv('USER'),
+    'password': os.getenv('PASSWORD'),
+    'db': os.getenv('DB'),
+    "ssl_ca": ROOT_DIR / "isrgrootx1.crt", #only for TiDB
+    "ssl_verify_cert": True, #only for TiDB
+    'charset': 'utf8mb4'    
+}
 
 # -----------------------------
 # 모델 설정
@@ -35,6 +60,20 @@ llm_groq = ChatGroq(
     top_p=1,
     stop=None,
 )
+
+hf_embeddings = HuggingFaceEmbeddings(
+    model_name="Qwen/Qwen3-Embedding-0.6B",
+    model_kwargs={'device': 'cpu'}, # GPU 없으면 'cpu'
+    encode_kwargs={'normalize_embeddings': True}
+)
+
+selfintro_retriever = HybridRetriever(
+    db_config=DB_CONFIG,
+    embeddings=hf_embeddings,
+    top_n=3,       
+    initial_k=5,
+    index_folder= str(ROOT_DIR / "faiss_index_high") #faiss 인덱스 저장 경로로 지정
+)  
 
 OVERSTATEMENT_PATTERNS = [
     "차별화된 경쟁력을 확보",
@@ -319,6 +358,9 @@ def load_raw_samples() -> list[str]:
         return [str(x).strip() for x in raw if str(x).strip()]
     return []
 
+def retrieve_raw_samples(query: str) -> list[str]:
+    search_results = selfintro_retriever.invoke(query)
+    return [doc.page_content.strip() for doc in search_results]
 
 def build_sample_excerpt(samples: list[str], max_chars_per_sample: int = 700) -> str:
     trimmed = []
@@ -443,8 +485,15 @@ def extract_sample_style_rules(sample_summary: str, selected_model: str) -> str:
         )
 
 
-def get_sample_context(selected_model: str) -> dict[str, Any]:
-    samples = load_raw_samples()
+def get_sample_context(selected_model: str, profile: dict[str, Any]) -> dict[str, Any]:
+    query = f"""[최종학력] {profile["school"]} {profile['major']}
+    [경력 및 경험]
+    {profile["exp"]}
+    {profile["awards"]}
+    [기술 및 역량]
+    {profile["tech"]}
+    """
+    samples = retrieve_raw_samples(query)
     sample_summary = summarize_samples(samples, selected_model)
     style_rules = extract_sample_style_rules(sample_summary, selected_model)
 
@@ -584,7 +633,7 @@ def get_refine_system_prompt(question_type: str) -> str:
 def build_local_draft(user_message: str, user_profile: tuple, selected_model: str = "GPT-4o-mini") -> str:
     profile = parse_user_profile(user_profile)
     parsed = parse_user_request(user_message, selected_model)
-    sample_context = get_sample_context(selected_model)
+    sample_context = get_sample_context(selected_model, profile) #profile 정보 기반 sample 검색
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", get_local_system_prompt(parsed["question_type"])),
