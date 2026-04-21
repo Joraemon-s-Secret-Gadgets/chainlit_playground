@@ -9,10 +9,12 @@ from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from langchain_ollama import ChatOllama
+from langchain_ollama import ChatOllama # runpod 적용 시 제거 예정
 from langchain_openai import ChatOpenAI
 
 from langchain_huggingface import HuggingFaceEmbeddings
+
+from .chat_ollama import call_runpod_ollama 
 
 load_dotenv()
 
@@ -43,6 +45,8 @@ DB_CONFIG = {
 # -----------------------------
 # 모델 설정
 # -----------------------------
+
+# Ollama = runpod 적용 시 제거 예정
 local_llm = ChatOllama(
     model="exaone3.5:7.8b",
     base_url="http://localhost:11434",
@@ -695,6 +699,72 @@ def build_local_draft(user_message: str, user_profile: tuple, selected_model: st
 
     return clean_text(remove_forbidden_headers(result))
 
+# 4/21 runpod serverless 대응 수정
+def build_draft_with_ollama(user_message: str, user_profile: tuple, selected_model: str = "GPT-4o-mini") -> str:
+    profile = parse_user_profile(user_profile)
+    parsed = parse_user_request(user_message, selected_model)
+    sample_context = get_sample_context(selected_model, profile) #profile 정보 기반 sample 검색
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", get_local_system_prompt(parsed["question_type"])),
+        ("human", """
+[지원자 정보]
+- 성별: {gender}
+- 학교: {school}
+- 전공: {major}
+- 직무 관련 경험: {exp}
+- 수상 및 대외활동: {awards}
+- 기술 스택 / 자격증: {tech}
+
+[사용자 요청 원문]
+{user_message}
+
+[실제 지원 정보]
+- 실제 지원 회사명: {company}
+- 실제 지원 직무명: {job}
+- 문항: {question}
+- 문항 유형: {question_type}
+- 글자 수 제한: {char_limit}
+
+[유사 샘플 패턴 요약]
+{sample_summary}
+
+[샘플 기반 작성 규칙]
+{style_rules}
+
+[유사 샘플 원문 발췌]
+{sample_excerpt}
+
+요구사항:
+- 샘플은 표현 패턴과 강점 서술 방식을 참고하는 용도로만 활용하라.
+- 실제 회사명과 직무명은 사용자 입력 기준으로만 반영하라.
+- 샘플 문장을 베끼지 말고, 사용자 이력으로 새롭게 써라.
+- 사용자를 단순히 분석 툴을 쓴 사람처럼 쓰지 말고, 데이터를 구조화하고 기준을 정리해 활용 가능한 형태로 연결한 사람처럼 보이게 하라.
+- 자기소개서 본문 초안만 써라.
+        """)
+    ])
+
+    final_prompt = prompt.invoke({
+        "gender": profile["gender"],
+        "school": profile["school"],
+        "major": profile["major"],
+        "exp": profile["exp"],
+        "awards": profile["awards"],
+        "tech": profile["tech"],
+        "user_message": parsed["raw"],
+        "company": parsed["company"] or "미기재",
+        "job": parsed["job"] or "미기재",
+        "question": parsed["question"] or "미기재",
+        "question_type": parsed["question_type"],
+        "char_limit": parsed["char_limit"] or "미기재",
+        "sample_summary": sample_context["sample_summary"],
+        "style_rules": sample_context["style_rules"],
+        "sample_excerpt": sample_context["sample_excerpt"] or "없음",
+    })
+    
+    
+    result = call_runpod_ollama(final_prompt.to_messages()) #runpod 호출로 생성된 답변 받아옴
+    return clean_text(remove_forbidden_headers(result))
 
 def regenerate_local_draft_if_needed(
     user_message: str,
@@ -707,7 +777,7 @@ def regenerate_local_draft_if_needed(
     working_message = user_message
 
     for attempt in range(max_attempts):
-        draft = build_local_draft(working_message, user_profile, selected_model)
+        draft = build_local_draft(working_message, user_profile, selected_model) #build_draft_with_ollama(working_message, user_profile, selected_model)
         is_ok, reason = score_local_draft(draft, parsed)
         last_text = draft
 
