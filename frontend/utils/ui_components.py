@@ -53,7 +53,7 @@ def apply_custom_css():
             transition: left 0.3s ease-in-out;
         }}
 
-        /* 🔥 4. 핵심 마법: 사이드바가 '열려있을 때'만 오른쪽으로 168px 밀어줌 (사이드바 336px의 절반) */
+        /* 사이드바가 '열려있을 때'만 오른쪽으로 168px 밀어줌 (사이드바 336px의 절반) */
         section[data-testid="stSidebar"][aria-expanded="true"] + section.main .header-content {{
             left: calc(50% + 168px) !important;
         }}
@@ -85,7 +85,7 @@ def apply_custom_css():
             padding-bottom: 2rem !important; 
         }}
 
-        /* 기존 유지 CSS */
+        /* CSS */
         [data-testid="stSidebarHeader"] {{padding: 0px !important; margin: 0px !important;}}
         [data-testid="stSidebarUserContent"] {{
             padding-top: 1rem !important;

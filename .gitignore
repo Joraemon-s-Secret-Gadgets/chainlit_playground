@@ -13,4 +13,5 @@ venv/
 .DS_Store
 
 # Chainlit 관련 (필요하면 제외)
-# .chainlit/
+# .chainlit/env_added.env
+env_added.env

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import database as db
-import auth  # 👈 방금 추가한 backend/auth.py를 임포트합니다!
+import auth  
 
 router = APIRouter()
 
